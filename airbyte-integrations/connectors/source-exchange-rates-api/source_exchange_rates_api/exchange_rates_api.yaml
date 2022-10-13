@@ -1,0 +1,52 @@
+version: "0.1.0"
+
+definitions:
+  selector:
+    extractor:
+      field_pointer: [ ]
+  requester:
+    url_base: "https://api.apilayer.com"
+    http_method: "GET"
+    authenticator:
+      type: ApiKeyAuthenticator
+      header: "apikey"
+      api_token: "{{ config['access_key'] }}"
+    request_options_provider:
+      request_parameters:
+        base: "{{ config['base'] }}"
+  stream_slicer:
+    type: "DatetimeStreamSlicer"
+    start_datetime:
+      datetime: "{{ config['start_date'] }}"
+      datetime_format: "%Y-%m-%d"
+    end_datetime:
+      datetime: "{{ now_utc() }}"
+      datetime_format: "%Y-%m-%d %H:%M:%S.%f"
+    step: "1d"
+    datetime_format: "%Y-%m-%d"
+    cursor_field: "{{ options['stream_cursor_field'] }}"
+  retriever:
+    record_selector:
+      $ref: "*ref(definitions.selector)"
+    paginator:
+      type: NoPagination
+    requester:
+      $ref: "*ref(definitions.requester)"
+    stream_slicer:
+      $ref: "*ref(definitions.stream_slicer)"
+  base_stream:
+    retriever:
+      $ref: "*ref(definitions.retriever)"
+  rates_stream:
+    $ref: "*ref(definitions.base_stream)"
+    $options:
+      name: "rates"
+      primary_key: "date"
+      path: "/exchangerates_data/{{stream_slice['start_date'] or 'latest'}}"
+      stream_cursor_field: "date"
+
+streams:
+  - "*ref(definitions.rates_stream)"
+check:
+  stream_names:
+    - "rates"
